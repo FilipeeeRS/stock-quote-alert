@@ -1,0 +1,21 @@
+{
+  "alertRecipient": "destinatario@exemplo.com",
+
+  "smtp": {
+    "host": "smtp.gmail.com",
+    "port": 587,
+    "useSsl": true,
+    "username": "sua-conta@gmail.com",
+    "password": "sua-senha-de-app",
+    "fromAddress": "sua-conta@gmail.com",
+    "fromName": "Stock Quote Alert"
+  },
+
+  "api": {
+    "baseUrl": "https://brapi.dev/api/quote/",
+    "token": ""
+  },
+
+  "pollIntervalSeconds": 30,
+  "alertCooldownMinutes": 15
+}
