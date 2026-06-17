@@ -1,0 +1,19 @@
+# Build artifacts
+bin/
+obj/
+out/
+
+# Real configuration (contém credenciais SMTP — não versionar)
+config.json
+**/config.json
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
