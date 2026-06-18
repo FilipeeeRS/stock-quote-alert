@@ -29,12 +29,21 @@ public class CliArgumentsTests
         Assert.Equal(58.10m, result.BuyThreshold);
     }
 
-    [Theory]
-    [InlineData(new[] { "PETR4", "22.67" })]                 // poucos args
-    [InlineData(new[] { "PETR4", "22.67", "22.59", "x" })]   // args demais
-    public void Rejects_wrong_arg_count(string[] args)
+    [Fact]
+    public void Rejects_too_few_args()
     {
-        bool ok = CliArguments.TryParse(args, out var result, out var error);
+        bool ok = CliArguments.TryParse(
+            new[] { "PETR4", "22.67" }, out var result, out var error);
+        Assert.False(ok);
+        Assert.Null(result);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void Rejects_too_many_args()
+    {
+        bool ok = CliArguments.TryParse(
+            new[] { "PETR4", "22.67", "22.59", "x" }, out var result, out var error);
         Assert.False(ok);
         Assert.Null(result);
         Assert.NotNull(error);
