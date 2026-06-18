@@ -7,7 +7,6 @@
     <Nullable>enable</Nullable>
     <AssemblyName>stock-quote-alert</AssemblyName>
     <RootNamespace>StockQuoteAlert</RootNamespace>
-    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
