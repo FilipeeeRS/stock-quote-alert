@@ -1,60 +1,42 @@
 # Stock Quote Alert
 
-Aplicação de **console em C# (.NET 8)** que monitora continuamente a cotação de um ativo da **B3** e envia um **e-mail** de alerta quando o preço cruza limites de referência:
+Aplicação de console em C# (.NET 8) que monitora a cotação de um ativo da B3 e envia um e-mail de alerta quando o preço passa de certos limites:
 
-- Preço **acima** da linha de venda → alerta de **VENDA**
-- Preço **abaixo** da linha de compra → alerta de **COMPRA**
+- Preço **acima** da linha de venda → alerta de **venda**
+- Preço **abaixo** da linha de compra → alerta de **compra**
 
-A fonte de cotações é a API pública [brapi.dev](https://brapi.dev).
+As cotações vêm da API pública [brapi.dev](https://brapi.dev).
 
----
+## Como usar
 
-## Uso
-
-```bash
-stock-quote-alert <ATIVO> <PRECO_VENDA> <PRECO_COMPRA>
-```
-
-Exemplo (igual ao enunciado):
+Rode passando o ativo, o preço de venda e o preço de compra:
 
 ```bash
-stock-quote-alert PETR4 22.67 22.59
+dotnet run --project src/StockQuoteAlert -- PETR4 22.67 22.59
 ```
 
-| Parâmetro      | Significado                                                  |
-|----------------|-------------------------------------------------------------|
-| `ATIVO`        | Ticker na B3 (ex.: `PETR4`)                                  |
-| `PRECO_VENDA`  | Linha azul — acima dela, dispara alerta de **venda**        |
-| `PRECO_COMPRA` | Linha vermelha — abaixo dela, dispara alerta de **compra**  |
-
-> Aceita ponto ou vírgula como separador decimal. O preço de venda deve ser maior que o de compra.
-
-O programa roda em loop até receber `Ctrl+C`.
-
----
+O programa fica monitorando em loop (a cada 30s por padrão) e envia o e-mail quando o preço cruza um dos limites. Para encerrar, use `Ctrl+C`.
 
 ## Configuração
 
-As informações sensíveis (destinatário e SMTP) ficam em um arquivo JSON **separado dos argumentos**, conforme o enunciado.
+O e-mail de destino e os dados de SMTP ficam num arquivo JSON separado. Para criar o seu:
 
 1. Copie o exemplo:
-
    ```bash
    cp src/StockQuoteAlert/config.example.json src/StockQuoteAlert/config.json
    ```
-
-2. Edite `config.json`:
+2. Abra o `config.json` e preencha com seus dados:
 
    ```json
    {
-     "alertRecipient": "destinatario@exemplo.com",
+     "alertRecipient": "seu-email@gmail.com",
      "smtp": {
        "host": "smtp.gmail.com",
        "port": 587,
        "useSsl": true,
-       "username": "sua-conta@gmail.com",
+       "username": "seu-email@gmail.com",
        "password": "sua-senha-de-app",
-       "fromAddress": "sua-conta@gmail.com",
+       "fromAddress": "seu-email@gmail.com",
        "fromName": "Stock Quote Alert"
      },
      "api": {
@@ -66,60 +48,36 @@ As informações sensíveis (destinatário e SMTP) ficam em um arquivo JSON **se
    }
    ```
 
-| Campo                  | Descrição                                                                 |
-|------------------------|---------------------------------------------------------------------------|
-| `alertRecipient`       | E-mail que receberá os alertas                                            |
-| `smtp.*`               | Servidor SMTP de envio                                                     |
-| `api.token`            | Token brapi.dev (opcional; `PETR4`, `VALE3`, `MGLU3`, `ITUB4` funcionam sem token) |
-| `pollIntervalSeconds`  | Intervalo entre consultas (padrão 30s)                                    |
-| `alertCooldownMinutes` | Tempo mínimo entre dois alertas do **mesmo** tipo (evita spam)            |
+Observações:
+- Se usar Gmail, o campo `password` precisa ser uma **senha de app** (não a senha normal da conta).
+- O `api.token` pode ficar vazio para ativos comuns como PETR4 e VALE3.
+- O `config.json` está no `.gitignore` porque contém senha; só o `config.example.json` vai para o repositório.
 
-O caminho do config pode ser sobrescrito pela variável de ambiente `STOCK_ALERT_CONFIG`. Caso contrário, busca `config.json` ao lado do executável.
-
-> ⚠️ `config.json` está no `.gitignore` por conter credenciais. Apenas `config.example.json` é versionado.
-
----
-
-## Como rodar
+## Rodar os testes
 
 ```bash
-# restaurar e compilar
-dotnet build
-
-# executar
-dotnet run --project src/StockQuoteAlert -- PETR4 22.67 22.59
-
-# rodar os testes
 dotnet test
 ```
 
----
+Os testes cobrem a validação dos parâmetros e a lógica de alerta (cruzamento de limites, faixa neutra e cooldown). Não dependem de rede nem enviam e-mail de verdade.
 
-## Decisões de projeto
+## Como o projeto está organizado
 
-- **Separação por responsabilidade**: cotação (`IQuoteProvider`), notificação (`INotifier`), configuração, CLI e monitoramento ficam em camadas independentes.
-- **Programação para interfaces**: `IQuoteProvider` e `INotifier` permitem trocar a API de cotação ou o canal de notificação sem tocar na lógica central, e tornam o `StockMonitor` testável com *fakes* (sem rede nem SMTP).
-- **Detecção por cruzamento + cooldown**: o alerta é disparado quando o preço *cruza* um limite, não a cada leitura dentro da faixa. Um cooldown configurável evita enxurrada de e-mails quando o preço oscila junto ao limite.
-- **Robustez do loop**: falhas de rede/timeout/parse são registradas e o monitoramento continua, em vez de derrubar o processo.
-- **Clock injetável** no monitor para testar o cooldown de forma determinística.
-- **Encerramento gracioso** via `Ctrl+C` (`CancellationToken`).
+O código é separado em camadas, cada uma com sua responsabilidade:
 
-## Estrutura
+| Pasta | O que faz |
+|-------|-----------|
+| `Cli/` | Lê e valida os parâmetros da linha de comando |
+| `Configuration/` | Lê o arquivo de configuração JSON |
+| `Quotes/` | Busca a cotação na brapi.dev |
+| `Notifications/` | Envia o alerta por e-mail (SMTP) |
+| `Monitoring/` | Loop de monitoramento e lógica de alerta |
+| `Program.cs` | Junta tudo e inicia a aplicação |
 
-```
-src/StockQuoteAlert/
-  Program.cs                     # composição e ponto de entrada
-  Cli/CliArguments.cs            # parsing/validação dos argumentos
-  Configuration/                 # AppSettings + ConfigLoader (JSON)
-  Quotes/                        # IQuoteProvider + BrapiQuoteProvider
-  Notifications/                 # INotifier + EmailNotifier (SMTP)
-  Monitoring/StockMonitor.cs     # loop e lógica de alerta
-tests/StockQuoteAlert.Tests/     # testes (xUnit)
-```
+As partes de cotação e de e-mail ficam atrás de interfaces (`IQuoteProvider` e `INotifier`), o que facilita os testes e permite trocar a fonte de cotação ou o canal de aviso sem mexer no resto.
 
-## Possíveis evoluções
+## Detalhes da lógica
 
-- Suporte a múltiplos ativos numa só execução.
-- Logging estruturado (Serilog) e injeção de dependência via `Microsoft.Extensions.*`.
-- Retry com *backoff* exponencial nas chamadas HTTP.
-- Notificação por outros canais (Telegram, webhook) implementando `INotifier`.
+- **Alerta por cruzamento:** o e-mail é enviado quando o preço *cruza* um limite, não a cada leitura — assim você não recebe dezenas de e-mails iguais enquanto o preço continua fora da faixa.
+- **Cooldown:** um intervalo mínimo entre alertas do mesmo tipo, configurável, para evitar spam.
+- **Resiliência:** falhas de rede ou da API são tratadas para não derrubar a aplicação.
