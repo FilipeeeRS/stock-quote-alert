@@ -9,6 +9,7 @@ namespace StockQuoteAlert.Quotes;
 /// <summary>
 /// Provedor de cotações baseado na API pública brapi.dev (mercado B3).
 /// Endpoint: GET /api/quote/{ticker} -> results[0].regularMarketPrice
+/// Com ?range=6mo&amp;interval=1d vem também results[0].historicalDataPrice.
 /// </summary>
 public sealed class BrapiQuoteProvider : IQuoteProvider
 {
@@ -27,7 +28,33 @@ public sealed class BrapiQuoteProvider : IQuoteProvider
 
     public async Task<decimal?> GetCurrentPriceAsync(string ticker, CancellationToken cancellationToken)
     {
+        BrapiResult? result = await FetchAsync(ticker, range: null, cancellationToken);
+        return result?.RegularMarketPrice;
+    }
+
+    public async Task<QuoteSnapshot?> GetSnapshotAsync(string ticker, string range,
+        CancellationToken cancellationToken)
+    {
+        BrapiResult? result = await FetchAsync(ticker, range, cancellationToken);
+
+        if (result?.RegularMarketPrice is null)
+            return null;
+
+        // Alguns dias podem vir sem fechamento (feriado, pregão interrompido); descartamos.
+        var closes = (result.HistoricalDataPrice ?? new List<BrapiHistoryPoint>())
+            .Where(p => p.Close is > 0)
+            .Select(p => p.Close!.Value)
+            .ToList();
+
+        return new QuoteSnapshot(ticker, result.RegularMarketPrice.Value, closes);
+    }
+
+    private async Task<BrapiResult?> FetchAsync(string ticker, string? range,
+        CancellationToken cancellationToken)
+    {
         string url = _api.BaseUrl.TrimEnd('/') + "/" + Uri.EscapeDataString(ticker);
+        if (!string.IsNullOrWhiteSpace(range))
+            url += $"?range={Uri.EscapeDataString(range)}&interval=1d";
 
         HttpResponseMessage response;
         try
@@ -41,35 +68,55 @@ public sealed class BrapiQuoteProvider : IQuoteProvider
             return null;
         }
 
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        using (response)
         {
-            Console.Error.WriteLine($"[brapi] Ativo '{ticker}' não encontrado (404).");
-            return null;
-        }
+            if (!response.IsSuccessStatusCode)
+            {
+                ReportFailure(ticker, response.StatusCode);
+                return null;
+            }
 
-        if (!response.IsSuccessStatusCode)
+            string body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            try
+            {
+                var payload = JsonSerializer.Deserialize<BrapiResponse>(body);
+                var result = payload?.Results?.FirstOrDefault();
+
+                if (result?.RegularMarketPrice is null)
+                    Console.Error.WriteLine($"[brapi] Cotação ausente na resposta para {ticker}.");
+
+                return result;
+            }
+            catch (JsonException ex)
+            {
+                Console.Error.WriteLine($"[brapi] Falha ao interpretar resposta para {ticker}: {ex.Message}");
+                return null;
+            }
+        }
+    }
+
+    private static void ReportFailure(string ticker, HttpStatusCode status)
+    {
+        // Atenção: a brapi responde 401 (não 404) quando o ativo não está liberado
+        // sem token. Sem token funcionam apenas PETR4, VALE3, ITUB4 e MGLU3.
+        string message = status switch
         {
-            Console.Error.WriteLine($"[brapi] Resposta HTTP {(int)response.StatusCode} ao consultar {ticker}.");
-            return null;
-        }
+            HttpStatusCode.Unauthorized =>
+                $"'{ticker}' exige um token da brapi. Sem token, apenas PETR4, VALE3, ITUB4 " +
+                "e MGLU3 funcionam. Crie uma conta em brapi.dev e preencha 'api.token' no config.json.",
 
-        string body = await response.Content.ReadAsStringAsync(cancellationToken);
+            HttpStatusCode.NotFound =>
+                $"Ativo '{ticker}' não encontrado.",
 
-        try
-        {
-            var payload = JsonSerializer.Deserialize<BrapiResponse>(body);
-            var price = payload?.Results?.FirstOrDefault()?.RegularMarketPrice;
+            HttpStatusCode.TooManyRequests =>
+                $"Limite de requisições da brapi excedido ao consultar {ticker}. " +
+                "Aumente 'tickIntervalMinutes' ou monitore menos ativos.",
 
-            if (price is null)
-                Console.Error.WriteLine($"[brapi] Cotação ausente na resposta para {ticker}.");
+            _ => $"Resposta HTTP {(int)status} ao consultar {ticker}."
+        };
 
-            return price;
-        }
-        catch (JsonException ex)
-        {
-            Console.Error.WriteLine($"[brapi] Falha ao interpretar resposta para {ticker}: {ex.Message}");
-            return null;
-        }
+        Console.Error.WriteLine($"[brapi] {message}");
     }
 
     // DTOs internos do payload da brapi.
@@ -86,5 +133,14 @@ public sealed class BrapiQuoteProvider : IQuoteProvider
 
         [JsonPropertyName("regularMarketPrice")]
         public decimal? RegularMarketPrice { get; set; }
+
+        [JsonPropertyName("historicalDataPrice")]
+        public List<BrapiHistoryPoint>? HistoricalDataPrice { get; set; }
+    }
+
+    private sealed class BrapiHistoryPoint
+    {
+        [JsonPropertyName("close")]
+        public decimal? Close { get; set; }
     }
 }

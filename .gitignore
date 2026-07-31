@@ -7,6 +7,14 @@ out/
 config.json
 **/config.json
 
+# Banco de dados (contém e-mails dos inscritos — não versionar)
+# Atenção: não use apenas "data/" aqui. Essa regra casa com qualquer pasta
+# chamada "data" em qualquer nível e, como o git no Windows não diferencia
+# maiúsculas, ela engolia a pasta de código src/StockQuoteAlert/Data/ inteira.
+*.db
+*.db-shm
+*.db-wal
+
 # IDE
 .vs/
 .vscode/

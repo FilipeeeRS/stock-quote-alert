@@ -1,4 +1,6 @@
 {
+  // Usado apenas pelo modo original (Etapa 1), com 3 argumentos.
+  // No modo de inscrições os destinatários vêm do banco.
   "alertRecipient": "destinatario@exemplo.com",
 
   "smtp": {
@@ -13,8 +15,40 @@
 
   "api": {
     "baseUrl": "https://brapi.dev/api/quote/",
+    // Sem token só funcionam PETR4, VALE3, ITUB4 e MGLU3.
+    // Para qualquer outro ativo, crie uma conta gratuita em brapi.dev.
     "token": ""
   },
+
+  "database": {
+    "path": "data/alerts.db"
+  },
+
+  "monitoring": {
+    // 5 minutos não é chute: no plano gratuito a cotação chega com ~30 min de
+    // atraso, então consultar mais rápido não traz informação nova, só gasta cota.
+    "tickIntervalMinutes": 5,
+
+    // Dormir fora do pregão da B3 economiza cerca de 5x da cota mensal.
+    "respectMarketHours": true,
+
+    // Janela de histórico usada para calcular os limites automaticamente.
+    "historyRange": "6mo",
+
+    // Abaixo do percentil 20 está barato; acima do 80, caro.
+    "buyPercentile": 20,
+    "sellPercentile": 80,
+
+    // O histórico é diário, então refazer a conta a cada rodada não mudaria nada.
+    "thresholdRefreshHours": 24,
+
+    // Pausa entre ativos diferentes, para não estourar o limite por minuto.
+    "delayBetweenTickersMs": 3500
+  },
+
+  // Endereço da página que recebe o clique em "Cancelar" no e-mail.
+  // Fica vazio até o site existir (Etapa 4).
+  "cancelBaseUrl": "",
 
   "pollIntervalSeconds": 30,
   "alertCooldownMinutes": 15

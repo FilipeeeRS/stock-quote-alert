@@ -46,7 +46,8 @@ public sealed class StockMonitor
             decimal? price = await _quotes.GetCurrentPriceAsync(_args.Ticker, cancellationToken);
             if (price is not null)
             {
-                Console.WriteLine($"[{_clock():HH:mm:ss}] {_args.Ticker} = {price.Value:0.00}");
+                // O relógio interno é UTC; na tela mostramos horário de Brasília.
+                Console.WriteLine($"[{Stamp()}] {_args.Ticker} = {price.Value:0.00}");
                 await ProcessPriceAsync(price.Value, cancellationToken);
             }
 
@@ -92,7 +93,7 @@ public sealed class StockMonitor
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[{_clock():HH:mm:ss}] Falha ao enviar alerta: {ex.Message}");
+            Console.Error.WriteLine($"[{Stamp()}] Falha ao enviar alerta: {ex.Message}");
         }
     }
 
@@ -101,6 +102,8 @@ public sealed class StockMonitor
         DateTime? last = type == AlertType.Sell ? _lastSellAlert : _lastBuyAlert;
         return last is null || _clock() - last.Value >= _cooldown;
     }
+
+    private string Stamp() => MarketHours.ToBrasilia(_clock()).ToString("HH:mm:ss");
 
     private void RecordAlert(AlertType type)
     {
