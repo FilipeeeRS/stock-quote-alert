@@ -1,0 +1,168 @@
+/*
+ * Estilo compartilhado pelas páginas do site.
+ * Tema escuro único: a cena 3D de fundo só faz sentido no escuro.
+ */
+
+:root {
+  --tinta: #0a0c12;
+  --vidro: rgba(19, 23, 32, 0.62);
+  --vidro-alto: rgba(26, 31, 42, 0.55);
+  --borda: rgba(255, 255, 255, 0.09);
+  --texto: #eef1f6;
+  --suave: #9aa3b4;
+  --tenue: #626d80;
+  --azul: #4d8dff;
+  --azul-claro: #7fb2ff;
+  --azul-escuro: #2f6fe0;
+  --verde: #34d399;
+  --verde-fraco: rgba(52, 211, 153, 0.14);
+  --vermelho: #fb7185;
+  --vermelho-fraco: rgba(251, 113, 133, 0.14);
+  --vermelho-forte: #c9455c;
+  --sombra: 0 2px 6px rgba(0, 0, 0, .5), 0 24px 64px rgba(0, 0, 0, .55);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  background: var(--tinta);
+  color: var(--texto);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ---------- camadas de fundo ---------- */
+
+#cena {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: -2;
+}
+
+/* Escurece topo e base para o conteúdo continuar legível por cima da
+   animação. Sem isto o grid brilhante briga com o texto. */
+#veu {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(125% 78% at 50% 40%, transparent 0%, rgba(10,12,18,.50) 54%, rgba(10,12,18,.88) 100%),
+    linear-gradient(180deg,
+      rgba(10,12,18,.94) 0%,
+      rgba(10,12,18,.42) 20%,
+      rgba(10,12,18,.20) 42%,
+      rgba(10,12,18,.52) 72%,
+      rgba(10,12,18,.86) 100%);
+}
+
+/* ---------- campos e botões ---------- */
+
+input {
+  width: 100%;
+  padding: 15px 16px;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--texto);
+  background: var(--vidro);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--borda);
+  border-radius: 14px;
+  outline: none;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+input::placeholder { color: var(--tenue); }
+
+input:focus-visible {
+  border-color: var(--azul);
+  box-shadow: 0 0 0 3.5px rgba(77, 141, 255, .22);
+}
+
+button {
+  padding: 15px 23px;
+  font: inherit;
+  font-size: 0.98rem;
+  font-weight: 640;
+  color: #fff;
+  background: linear-gradient(180deg, var(--azul) 0%, var(--azul-escuro) 100%);
+  border: 0;
+  border-radius: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(47, 111, 224, .34);
+  transition: filter .18s ease, transform .12s ease, opacity .18s ease;
+}
+
+button:hover:not(:disabled) { filter: brightness(1.12); }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: .5; cursor: progress; }
+button:focus-visible { outline: none; box-shadow: 0 0 0 3.5px rgba(77, 141, 255, .4); }
+
+/* ---------- blocos de vidro ---------- */
+
+.cartao {
+  background: var(--vidro);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid var(--borda);
+  border-radius: 20px;
+  box-shadow: var(--sombra);
+  overflow: hidden;
+  animation: entrar .42s cubic-bezier(.22, .9, .3, 1) both;
+}
+
+@keyframes entrar {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---------- recados ---------- */
+
+.recado {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  border: 1px solid transparent;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: entrar .3s ease both;
+}
+
+.recado.erro { color: var(--vermelho); background: var(--vermelho-fraco); border-color: rgba(251, 113, 133, .3); }
+.recado.ok   { color: var(--verde);    background: var(--verde-fraco);    border-color: rgba(52, 211, 153, .3); }
+
+/* ---------- utilidades ---------- */
+
+label.oculto {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.escondido { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}

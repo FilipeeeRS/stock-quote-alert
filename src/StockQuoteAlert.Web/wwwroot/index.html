@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Alerta de Cotações — B3</title>
+  <link rel="stylesheet" href="/estilo.css">
+  <style>
+    body { align-items: flex-start; padding: clamp(24px, 7vh, 84px) 20px 56px; }
+    main { width: 100%; max-width: 545px; position: relative; }
+
+    /* ---------- cabeçalho ---------- */
+
+    .marca { display: flex; align-items: center; justify-content: center; gap: 9px; margin-bottom: 20px; }
+
+    .marca span {
+      font-size: 0.78rem; font-weight: 650; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--suave);
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.8rem, 6vw, 2.35rem);
+      font-weight: 680;
+      letter-spacing: -0.028em;
+      text-align: center;
+      line-height: 1.14;
+      background: linear-gradient(180deg, #ffffff 25%, #a9bfe4 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .legenda {
+      margin: 0 auto 32px; max-width: 27rem; text-align: center;
+      color: var(--suave); font-size: 0.95rem; line-height: 1.62;
+      text-shadow: 0 1px 12px rgba(10,12,18,.9);
+    }
+
+    /* ---------- busca ---------- */
+
+    .busca { display: flex; gap: 10px; }
+    .campo-ativo { position: relative; flex: 1; }
+
+    .campo-ativo svg {
+      position: absolute; left: 15px; top: 50%; margin-top: -8px;
+      color: var(--tenue); pointer-events: none;
+    }
+
+    #ativo {
+      padding-left: 43px; text-transform: uppercase;
+      letter-spacing: 0.06em; font-weight: 620;
+    }
+
+    #ativo::placeholder { text-transform: none; letter-spacing: normal; font-weight: 400; }
+
+    /* ---------- cartão do resultado ---------- */
+
+    #resultado { margin-top: 22px; }
+
+    .topo { padding: 22px 22px 0; }
+
+    .linha-ticker {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; margin-bottom: 5px;
+    }
+
+    .ticker { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; color: var(--suave); }
+
+    .selo {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 11px; border-radius: 999px;
+      font-size: 0.775rem; font-weight: 640; white-space: nowrap;
+      border: 1px solid transparent;
+    }
+
+    .selo::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .selo.compra { color: var(--verde);    background: var(--verde-fraco);    border-color: rgba(52,211,153,.28); }
+    .selo.venda  { color: var(--vermelho); background: var(--vermelho-fraco); border-color: rgba(251,113,133,.28); }
+    .selo.neutra { color: var(--suave);    background: rgba(154,163,180,.12); border-color: rgba(154,163,180,.2); }
+
+    .preco {
+      margin: 0;
+      font-size: clamp(2.2rem, 8.5vw, 2.9rem);
+      font-weight: 700; letter-spacing: -0.035em;
+      font-variant-numeric: tabular-nums; line-height: 1.08;
+      text-shadow: 0 2px 24px rgba(77,141,255,.2);
+    }
+
+    /* ---------- gráfico ---------- */
+
+    .grafico { margin-top: 14px; }
+    .grafico svg { display: block; width: 100%; height: auto; }
+
+    .eixo-legenda {
+      display: flex; justify-content: space-between;
+      padding: 7px 22px 0; font-size: 0.72rem; color: var(--tenue);
+    }
+
+    /* ---------- limites ---------- */
+
+    .limites {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+      margin-top: 18px; background: var(--borda); border-top: 1px solid var(--borda);
+    }
+
+    .limite { padding: 15px 22px; background: var(--vidro-alto); }
+    .limite dt { margin: 0 0 5px; font-size: 0.755rem; color: var(--suave); line-height: 1.35; }
+
+    .limite dd {
+      margin: 0; font-size: 1.16rem; font-weight: 670;
+      font-variant-numeric: tabular-nums; letter-spacing: -0.015em;
+    }
+
+    .limite.compra dd { color: var(--verde); }
+    .limite.venda dd  { color: var(--vermelho); }
+
+    /* ---------- rodapé do cartão ---------- */
+
+    .rodape-cartao { padding: 18px 22px 22px; border-top: 1px solid var(--borda); }
+    .explicacao { margin: 0 0 16px; font-size: 0.875rem; color: var(--suave); line-height: 1.62; }
+    .assinar { display: flex; gap: 10px; }
+
+    .ressalva {
+      margin: 28px auto 0; max-width: 30rem; text-align: center;
+      font-size: 0.775rem; color: #8994a8; line-height: 1.68;
+      /* O fundo animado passa por trás deste texto; a sombra garante contraste
+         mesmo quando uma linha clara do grid cruza atrás. */
+      text-shadow: 0 1px 10px rgba(10,12,18,.95), 0 0 22px rgba(10,12,18,.9);
+    }
+
+    @media (max-width: 430px) {
+      .busca, .assinar { flex-direction: column; }
+      button { width: 100%; }
+      .limites { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="cena" aria-hidden="true"></canvas>
+  <div id="veu" aria-hidden="true"></div>
+
+  <main>
+    <div class="marca">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M3 17.5 9 11l4 4 8-8.5" stroke="var(--azul-claro)" stroke-width="2.1"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M16 6.5h5v5" stroke="var(--azul-claro)" stroke-width="2.1"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>B3</span>
+    </div>
+
+    <h1>Alerta de cotações</h1>
+    <p class="legenda">
+      Escolha uma ação e deixe seu e-mail. Avisamos quando o preço ficar
+      fora do normal — sem cadastro, sem senha.
+    </p>
+
+    <form class="busca" id="form-busca" novalidate>
+      <div class="campo-ativo">
+        <label class="oculto" for="ativo">Código da ação</label>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/>
+        </svg>
+        <input id="ativo" name="ativo" placeholder="Digite uma ação: PETR4"
+               maxlength="6" autocomplete="off" autocapitalize="characters"
+               spellcheck="false" required>
+      </div>
+      <button type="submit" id="btn-buscar">Buscar</button>
+    </form>
+
+    <section id="resultado" class="cartao escondido" aria-live="polite">
+      <div class="topo">
+        <div class="linha-ticker">
+          <span class="ticker" id="ticker"></span>
+          <span class="selo neutra" id="selo"></span>
+        </div>
+        <p class="preco" id="preco"></p>
+      </div>
+
+      <div class="grafico" id="grafico"></div>
+      <div class="eixo-legenda" id="eixo-legenda">
+        <span id="eixo-inicio"></span>
+        <span>hoje</span>
+      </div>
+
+      <dl class="limites" id="limites">
+        <div class="limite compra">
+          <dt>Avisamos se cair abaixo de</dt>
+          <dd id="limite-compra"></dd>
+        </div>
+        <div class="limite venda">
+          <dt>Avisamos se subir acima de</dt>
+          <dd id="limite-venda"></dd>
+        </div>
+      </dl>
+
+      <div class="rodape-cartao">
+        <p class="explicacao" id="explicacao"></p>
+        <form class="assinar" id="form-assinar" novalidate>
+          <label class="oculto" for="email">Seu e-mail</label>
+          <input type="email" id="email" name="email" placeholder="seu@email.com"
+                 autocomplete="email" required>
+          <button type="submit" id="btn-assinar">Avisar-me</button>
+        </form>
+      </div>
+    </section>
+
+    <div id="recado" class="recado escondido" role="status"></div>
+
+    <p class="ressalva">
+      Os limites vêm da comparação do preço de hoje com os últimos 6 meses da própria ação.
+      Isto não é recomendação de investimento.
+    </p>
+  </main>
+
+  <script src="/cena.js" defer></script>
+  <script>
+    const dinheiro = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+    const el = (id) => document.getElementById(id);
+
+    const resultado = el('resultado');
+    const recado = el('recado');
+    let ativoAtual = null;
+
+    function mostrarRecado(texto, tipo) {
+      recado.textContent = texto;
+      recado.className = 'recado ' + tipo;
+    }
+
+    function limparRecado() {
+      recado.className = 'recado escondido';
+      recado.textContent = '';
+    }
+
+    function ocupado(botao, agora, textoOcupado, textoNormal) {
+      botao.disabled = agora;
+      botao.textContent = agora ? textoOcupado : textoNormal;
+    }
+
+    // ---------------------------------------------------------------
+    // O gráfico dos 6 meses: faixas de "barato" e "caro" pintadas ao
+    // fundo, as duas linhas de limite tracejadas e um ponto no preço
+    // de hoje. Responde no olho a pergunta "está caro ou barato?".
+    // ---------------------------------------------------------------
+    function desenharGrafico(historico, compra, venda) {
+      const alvo = el('grafico');
+      alvo.textContent = '';
+
+      if (!Array.isArray(historico) || historico.length < 2) {
+        el('eixo-legenda').classList.add('escondido');
+        return;
+      }
+      el('eixo-legenda').classList.remove('escondido');
+
+      const L = 600, A = 190, folgaTopo = 16, folgaBase = 16;
+      // Margem lateral para o ponto de hoje não ser cortado na borda.
+      const recuo = 10;
+
+      const candidatos = historico.slice();
+      if (compra != null) candidatos.push(compra);
+      if (venda != null) candidatos.push(venda);
+
+      let min = Math.min(...candidatos);
+      let max = Math.max(...candidatos);
+      // Se todos os valores forem iguais, abre uma janela artificial
+      // para não dividir por zero.
+      if (max - min < 1e-9) { max = min + 1; min = min - 1; }
+
+      const margem = (max - min) * 0.06;
+      min -= margem;
+      max += margem;
+
+      const x = (i) => recuo + (i / (historico.length - 1)) * (L - recuo * 2);
+      const y = (v) => A - folgaBase - ((v - min) / (max - min)) * (A - folgaTopo - folgaBase);
+
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('viewBox', `0 0 ${L} ${A}`);
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label',
+        `Preço nos últimos 6 meses, variando de ${dinheiro.format(Math.min(...historico))} a ${dinheiro.format(Math.max(...historico))}.`);
+
+      const criar = (tag, attrs) => {
+        const n = document.createElementNS(ns, tag);
+        for (const k in attrs) n.setAttribute(k, attrs[k]);
+        return n;
+      };
+
+      if (compra != null) {
+        const topo = y(compra);
+        svg.appendChild(criar('rect', {
+          x: 0, y: topo, width: L, height: Math.max(0, A - topo),
+          fill: 'var(--verde)', opacity: 0.1
+        }));
+      }
+      if (venda != null) {
+        const base = y(venda);
+        svg.appendChild(criar('rect', {
+          x: 0, y: 0, width: L, height: Math.max(0, base),
+          fill: 'var(--vermelho)', opacity: 0.1
+        }));
+      }
+
+      const tracejada = (valor, cor) => criar('line', {
+        x1: 0, x2: L, y1: y(valor), y2: y(valor),
+        stroke: cor, 'stroke-width': 1.4, 'stroke-dasharray': '5 5', opacity: 0.8
+      });
+      if (compra != null) svg.appendChild(tracejada(compra, 'var(--verde)'));
+      if (venda != null) svg.appendChild(tracejada(venda, 'var(--vermelho)'));
+
+      const defs = criar('defs', {});
+      const grad = criar('linearGradient', { id: 'degrade', x1: 0, y1: 0, x2: 0, y2: 1 });
+      grad.appendChild(criar('stop', { offset: '0%',   'stop-color': 'var(--azul-claro)', 'stop-opacity': 0.34 }));
+      grad.appendChild(criar('stop', { offset: '100%', 'stop-color': 'var(--azul-claro)', 'stop-opacity': 0 }));
+      defs.appendChild(grad);
+      svg.appendChild(defs);
+
+      const pontos = historico.map((v, i) => `${x(i).toFixed(2)},${y(v).toFixed(2)}`);
+
+      svg.appendChild(criar('path', {
+        d: `M${recuo},${A} L${pontos.join(' L')} L${L - recuo},${A} Z`,
+        fill: 'url(#degrade)'
+      }));
+
+      svg.appendChild(criar('path', {
+        d: `M${pontos.join(' L')}`,
+        fill: 'none', stroke: 'var(--azul-claro)', 'stroke-width': 2.4,
+        'stroke-linejoin': 'round', 'stroke-linecap': 'round'
+      }));
+
+      const ux = x(historico.length - 1);
+      const uy = y(historico[historico.length - 1]);
+      svg.appendChild(criar('circle', { cx: ux, cy: uy, r: 8, fill: 'var(--azul-claro)', opacity: 0.24 }));
+      svg.appendChild(criar('circle', {
+        cx: ux, cy: uy, r: 3.8, fill: '#ffffff',
+        stroke: 'var(--azul-claro)', 'stroke-width': 2
+      }));
+
+      alvo.appendChild(svg);
+    }
+
+    // ---------------------------------------------------------------
+
+    el('form-busca').addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+
+      const ativo = el('ativo').value.trim().toUpperCase();
+      if (!ativo) { el('ativo').focus(); return; }
+
+      limparRecado();
+      resultado.classList.add('escondido');
+      ocupado(el('btn-buscar'), true, 'Buscando…', 'Buscar');
+
+      try {
+        const resposta = await fetch(`/api/cotacao/${encodeURIComponent(ativo)}`);
+        const dados = await resposta.json();
+
+        if (!resposta.ok) {
+          mostrarRecado(dados.erro || 'Não foi possível buscar essa ação.', 'erro');
+          return;
+        }
+
+        ativoAtual = dados.ticker;
+        el('ticker').textContent = dados.ticker;
+        el('preco').textContent = dinheiro.format(dados.preco);
+        el('eixo-inicio').textContent = 'há 6 meses';
+
+        const temLimites = dados.limiteCompra != null && dados.limiteVenda != null;
+        const selo = el('selo');
+
+        if (!temLimites) {
+          selo.className = 'selo neutra';
+          selo.textContent = 'sem histórico';
+        } else if (dados.zonaAtual === 'compra') {
+          selo.className = 'selo compra';
+          selo.textContent = 'Está barato';
+        } else if (dados.zonaAtual === 'venda') {
+          selo.className = 'selo venda';
+          selo.textContent = 'Está caro';
+        } else {
+          selo.className = 'selo neutra';
+          selo.textContent = 'Na faixa normal';
+        }
+
+        desenharGrafico(dados.historico,
+          temLimites ? dados.limiteCompra : null,
+          temLimites ? dados.limiteVenda : null);
+
+        if (temLimites) {
+          el('limites').classList.remove('escondido');
+          el('limite-compra').textContent = dinheiro.format(dados.limiteCompra);
+          el('limite-venda').textContent = dinheiro.format(dados.limiteVenda);
+
+          if (dados.zonaAtual === 'compra') {
+            el('explicacao').textContent =
+              'O preço já está abaixo da linha de compra. Inscrevendo-se agora, ' +
+              'você recebe o primeiro aviso na próxima verificação.';
+          } else if (dados.zonaAtual === 'venda') {
+            el('explicacao').textContent =
+              'O preço já está acima da linha de venda. Inscrevendo-se agora, ' +
+              'você recebe o primeiro aviso na próxima verificação.';
+          } else {
+            el('explicacao').textContent =
+              'O preço está entre as duas linhas, então nada é enviado por enquanto. ' +
+              'O e-mail sai quando ele cruzar uma delas.';
+          }
+        } else {
+          el('limites').classList.add('escondido');
+          el('explicacao').textContent = dados.aviso || '';
+        }
+
+        resultado.classList.remove('escondido');
+        el('email').focus({ preventScroll: true });
+      } catch {
+        mostrarRecado('Falha de conexão. Verifique sua internet e tente de novo.', 'erro');
+      } finally {
+        ocupado(el('btn-buscar'), false, 'Buscando…', 'Buscar');
+      }
+    });
+
+    el('form-assinar').addEventListener('submit', async (evento) => {
+      evento.preventDefault();
+
+      const email = el('email').value.trim();
+      if (!email || !ativoAtual) { el('email').focus(); return; }
+
+      limparRecado();
+      ocupado(el('btn-assinar'), true, 'Salvando…', 'Avisar-me');
+
+      try {
+        const resposta = await fetch('/api/inscricoes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticker: ativoAtual, email })
+        });
+        const dados = await resposta.json();
+
+        if (!resposta.ok) {
+          mostrarRecado(dados.erro || 'Não foi possível salvar a inscrição.', 'erro');
+          return;
+        }
+
+        mostrarRecado(dados.mensagem + ' Todo e-mail traz um botão para cancelar.', 'ok');
+        el('form-assinar').reset();
+      } catch {
+        mostrarRecado('Falha de conexão. Verifique sua internet e tente de novo.', 'erro');
+      } finally {
+        ocupado(el('btn-assinar'), false, 'Salvando…', 'Avisar-me');
+      }
+    });
+  </script>
+</body>
+</html>

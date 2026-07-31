@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>StockQuoteAlert.Web</RootNamespace>
+
+    <!-- O projeto tem como alvo o .NET 8, mas roda também em runtimes mais
+         novos (9, 10...). Sem isto, a máquina que só tem o .NET 10 instalado
+         se recusa a executar. -->
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reaproveita tudo da Etapa 2: banco, cálculo dos limites, regra de
+         alerta e envio de e-mail. O site é só uma nova porta de entrada. -->
+    <ProjectReference Include="..\StockQuoteAlert\StockQuoteAlert.csproj" />
+  </ItemGroup>
+
+</Project>
