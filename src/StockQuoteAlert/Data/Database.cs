@@ -15,15 +15,53 @@ public sealed class Database
 
     public Database(string filePath)
     {
+        FilePath = ResolverCaminho(filePath);
+
         // Foreign Keys=True faz o SQLite realmente cobrar os relacionamentos
         // (por padrão ele aceita um InscricaoId que não existe).
         _connectionString = new SqliteConnectionStringBuilder
         {
-            DataSource = filePath,
+            DataSource = FilePath,
             ForeignKeys = true
         }.ToString();
+    }
 
-        FilePath = filePath;
+    /// <summary>
+    /// Transforma o caminho do config.json num caminho absoluto, ancorado na
+    /// raiz do projeto (a pasta que tem o arquivo .sln).
+    ///
+    /// POR QUE ISSO EXISTE: 'data/alerts.db' é relativo à pasta de onde o
+    /// programa roda, e o 'dotnet run' usa a pasta de cada projeto. Sem ancorar,
+    /// o console gravava num banco e o site noutro — você cadastrava pela linha
+    /// de comando e o site não mostrava nada, sem nenhuma pista do motivo.
+    ///
+    /// Caminho absoluto no config é respeitado como está. E quando o programa
+    /// for publicado não existe .sln nenhum, então cai na pasta de execução,
+    /// que é o esperado num servidor.
+    /// </summary>
+    private static string ResolverCaminho(string caminhoConfigurado)
+    {
+        if (Path.IsPathRooted(caminhoConfigurado))
+            return caminhoConfigurado;
+
+        string ancora = EncontrarRaizDoProjeto() ?? Directory.GetCurrentDirectory();
+        return Path.GetFullPath(Path.Combine(ancora, caminhoConfigurado));
+    }
+
+    private static string? EncontrarRaizDoProjeto()
+    {
+        // Sobe a partir da pasta do executável procurando o .sln.
+        var pasta = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (pasta is not null)
+        {
+            if (pasta.GetFiles("*.sln").Length > 0)
+                return pasta.FullName;
+
+            pasta = pasta.Parent;
+        }
+
+        return null;
     }
 
     public string FilePath { get; }
