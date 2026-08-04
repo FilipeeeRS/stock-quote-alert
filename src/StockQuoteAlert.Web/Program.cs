@@ -57,10 +57,15 @@ var app = builder.Build();
 
 if (string.IsNullOrWhiteSpace(settings.Smtp.Host))
 {
+    // Este é o primeiro aviso que aparece ao rodar sem configurar nada, então
+    // ele precisa dizer exatamente onde colocar o arquivo — não só um caminho.
     app.Logger.LogWarning(
-        "SMTP não configurado ({Caminho} não encontrado ou incompleto). O site funciona " +
-        "e aceita inscrições, mas nenhum e-mail será enviado até você preencher o config.json.",
-        configPath);
+        "SMTP não configurado: o site funciona e aceita inscrições, mas nenhum e-mail " +
+        "será enviado. Para ativar o envio, copie 'src/StockQuoteAlert/config.example.json' " +
+        "para um destes lugares: {Opcao1} ou {Opcao2} (ou aponte a variável de ambiente " +
+        "STOCK_ALERT_CONFIG para o arquivo).",
+        Path.Combine(builder.Environment.ContentRootPath, "config.json"),
+        Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", "StockQuoteAlert", "config.json")));
 }
 
 app.UseDefaultFiles();
