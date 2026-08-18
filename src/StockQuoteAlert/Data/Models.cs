@@ -25,13 +25,20 @@ public sealed record Subscription(
 /// Um ativo monitorado, com a última cotação lida e os limites calculados
 /// a partir do histórico. Compartilhado por todos os inscritos naquele ativo.
 /// </summary>
+/// <param name="BuyPercentile">
+/// Qual percentil gerou o limite guardado. Serve para perceber que a
+/// configuração mudou e refazer a conta, em vez de continuar usando um
+/// limite calculado com outra regra.
+/// </param>
 public sealed record Asset(
     string Ticker,
     decimal? CurrentPrice,
     decimal? BuyThreshold,
     decimal? SellThreshold,
     DateTime? ThresholdsComputedAt,
-    DateTime? CheckedAt)
+    DateTime? CheckedAt,
+    int? BuyPercentile = null,
+    int? SellPercentile = null)
 {
     /// <summary>
     /// Os limites só servem se os dois existirem e fizerem sentido

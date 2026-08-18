@@ -13,7 +13,8 @@ public sealed class AssetRepository
         using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT Ticker, PrecoAtual, LimiteCompra, LimiteVenda,
-                   LimitesCalculadosEm, ConsultadoEm
+                   LimitesCalculadosEm, ConsultadoEm,
+                   PercentilCompra, PercentilVenda
               FROM Ativos WHERE Ticker = $ticker;
             """;
         command.Parameters.AddWithValue("$ticker", ticker);
@@ -28,7 +29,9 @@ public sealed class AssetRepository
             BuyThreshold: DbValue.ToMoneyOrNull(reader.GetValue(2)),
             SellThreshold: DbValue.ToMoneyOrNull(reader.GetValue(3)),
             ThresholdsComputedAt: DbValue.ToDateOrNull(reader.GetValue(4)),
-            CheckedAt: DbValue.ToDateOrNull(reader.GetValue(5)));
+            CheckedAt: DbValue.ToDateOrNull(reader.GetValue(5)),
+            BuyPercentile: reader.IsDBNull(6) ? null : reader.GetInt32(6),
+            SellPercentile: reader.IsDBNull(7) ? null : reader.GetInt32(7));
     }
 
     /// <summary>
@@ -41,14 +44,18 @@ public sealed class AssetRepository
         using var command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO Ativos (Ticker, PrecoAtual, LimiteCompra, LimiteVenda,
-                                LimitesCalculadosEm, ConsultadoEm)
-            VALUES ($ticker, $preco, $compra, $venda, $calculadosEm, $consultadoEm)
+                                LimitesCalculadosEm, ConsultadoEm,
+                                PercentilCompra, PercentilVenda)
+            VALUES ($ticker, $preco, $compra, $venda, $calculadosEm, $consultadoEm,
+                    $pCompra, $pVenda)
             ON CONFLICT(Ticker) DO UPDATE SET
                 PrecoAtual          = excluded.PrecoAtual,
                 LimiteCompra        = excluded.LimiteCompra,
                 LimiteVenda         = excluded.LimiteVenda,
                 LimitesCalculadosEm = excluded.LimitesCalculadosEm,
-                ConsultadoEm        = excluded.ConsultadoEm;
+                ConsultadoEm        = excluded.ConsultadoEm,
+                PercentilCompra     = excluded.PercentilCompra,
+                PercentilVenda      = excluded.PercentilVenda;
             """;
         command.Parameters.AddWithValue("$ticker", asset.Ticker);
         command.Parameters.AddWithValue("$preco",
@@ -61,6 +68,8 @@ public sealed class AssetRepository
             (object?)DbValue.FromDate(asset.ThresholdsComputedAt) ?? DBNull.Value);
         command.Parameters.AddWithValue("$consultadoEm",
             (object?)DbValue.FromDate(asset.CheckedAt) ?? DBNull.Value);
+        command.Parameters.AddWithValue("$pCompra", (object?)asset.BuyPercentile ?? DBNull.Value);
+        command.Parameters.AddWithValue("$pVenda", (object?)asset.SellPercentile ?? DBNull.Value);
         command.ExecuteNonQuery();
     }
 }

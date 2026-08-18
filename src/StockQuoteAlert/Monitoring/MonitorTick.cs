@@ -119,7 +119,7 @@ public sealed class MonitorTick
 
         DateTime now = Now();
         Asset? stored = _assets.Get(ticker);
-        Thresholds? thresholds = ResolveThresholds(stored, snapshot, now);
+        (Thresholds? thresholds, bool reaproveitados) = ResolveThresholds(stored, snapshot, now);
 
         var asset = new Asset(
             Ticker: ticker,
@@ -128,8 +128,10 @@ public sealed class MonitorTick
             SellThreshold: thresholds?.Sell,
             ThresholdsComputedAt: thresholds is null
                 ? stored?.ThresholdsComputedAt
-                : (ReusedThresholds(stored, thresholds) ? stored!.ThresholdsComputedAt : now),
-            CheckedAt: now);
+                : (reaproveitados ? stored!.ThresholdsComputedAt : now),
+            CheckedAt: now,
+            BuyPercentile: thresholds is null ? stored?.BuyPercentile : _settings.BuyPercentile,
+            SellPercentile: thresholds is null ? stored?.SellPercentile : _settings.SellPercentile);
 
         _assets.Save(asset);
 
@@ -153,21 +155,26 @@ public sealed class MonitorTick
     /// Reaproveita os limites já calculados enquanto estiverem recentes.
     /// O histórico é diário, então refazer a conta a cada 5 minutos não mudaria nada.
     /// </summary>
-    private Thresholds? ResolveThresholds(Asset? stored, QuoteSnapshot snapshot, DateTime now)
+    private (Thresholds? Thresholds, bool Reaproveitados) ResolveThresholds(
+        Asset? stored, QuoteSnapshot snapshot, DateTime now)
     {
-        bool fresh = stored?.ThresholdsComputedAt is not null &&
-                     now - stored.ThresholdsComputedAt.Value <
-                         TimeSpan.FromHours(_settings.ThresholdRefreshHours);
+        bool recente = stored?.ThresholdsComputedAt is not null &&
+                       now - stored.ThresholdsComputedAt.Value <
+                           TimeSpan.FromHours(_settings.ThresholdRefreshHours);
 
-        if (fresh && stored!.HasUsableThresholds)
-            return new Thresholds(stored.BuyThreshold!.Value, stored.SellThreshold!.Value);
+        // A configuração pode ter mudado desde o último cálculo. Se mudou, o
+        // limite guardado foi feito com outra regra e não vale mais — senão
+        // mexer em 'buyPercentile'/'sellPercentile' não surtia efeito por 24h,
+        // sem nenhuma pista do porquê.
+        bool mesmaRegra = stored?.BuyPercentile == _settings.BuyPercentile &&
+                          stored?.SellPercentile == _settings.SellPercentile;
 
-        return ThresholdCalculator.Compute(
-            snapshot.ClosingPrices, _settings.BuyPercentile, _settings.SellPercentile);
+        if (recente && mesmaRegra && stored!.HasUsableThresholds)
+            return (new Thresholds(stored.BuyThreshold!.Value, stored.SellThreshold!.Value), true);
+
+        return (ThresholdCalculator.Compute(
+            snapshot.ClosingPrices, _settings.BuyPercentile, _settings.SellPercentile), false);
     }
-
-    private static bool ReusedThresholds(Asset? stored, Thresholds thresholds) =>
-        stored?.BuyThreshold == thresholds.Buy && stored?.SellThreshold == thresholds.Sell;
 
     private async Task<(int Evaluated, int Sent, int SendFailures)> NotifySubscribersAsync(
         string ticker, decimal price, Thresholds thresholds, DateTime now,

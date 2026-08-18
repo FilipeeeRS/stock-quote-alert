@@ -98,6 +98,47 @@ public sealed class Database
             ApplyVersion1(connection);
             SetVersion(connection, 1);
         }
+
+        if (current < 2)
+        {
+            ApplyVersion2(connection);
+            SetVersion(connection, 2);
+        }
+    }
+
+    /// <summary>
+    /// Guarda quais percentis geraram cada limite.
+    ///
+    /// POR QUE: os limites ficam guardados por 24h para não refazer a conta a
+    /// cada rodada. Só que, sem registrar de onde vieram, mudar 'buyPercentile'
+    /// ou 'sellPercentile' no config.json não surtia efeito nenhum até o prazo
+    /// vencer — e sem nenhuma mensagem explicando. Agora, se a configuração
+    /// mudar, o limite é recalculado na rodada seguinte.
+    ///
+    /// É também a primeira migração de verdade: quem já tem banco criado ganha
+    /// as colunas novas sem perder as inscrições.
+    /// </summary>
+    private static void ApplyVersion2(SqliteConnection connection)
+    {
+        foreach (string coluna in new[] { "PercentilCompra", "PercentilVenda" })
+        {
+            if (!ColunaExiste(connection, "Ativos", coluna))
+                Execute(connection, $"ALTER TABLE Ativos ADD COLUMN {coluna} INTEGER NULL;");
+        }
+    }
+
+    private static bool ColunaExiste(SqliteConnection connection, string tabela, string coluna)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({tabela});";
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), coluna, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     private static void ApplyVersion1(SqliteConnection connection)

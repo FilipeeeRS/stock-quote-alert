@@ -44,9 +44,14 @@ public class MonitorTickTests : IDisposable
     }
 
     private MonitorTick BuildTick(FakeQuoteProvider quotes, RecordingSubscriberNotifier notifier,
-        DateTime? clock = null) =>
+        DateTime? clock = null, int percentilCompra = 20, int percentilVenda = 80) =>
         new(quotes, notifier, _subscriptions, _assets, _notices,
-            new MonitoringSettings { DelayBetweenTickersMs = 0 },
+            new MonitoringSettings
+            {
+                DelayBetweenTickersMs = 0,
+                BuyPercentile = percentilCompra,
+                SellPercentile = percentilVenda
+            },
             TimeSpan.FromMinutes(15),
             () => clock ?? Agora);
 
@@ -206,6 +211,46 @@ public class MonitorTickTests : IDisposable
         Assert.Equal(20.80m, asset.BuyThreshold);
         Assert.Equal(80.20m, asset.SellThreshold);
         Assert.True(asset.HasUsableThresholds);
+    }
+
+    [Fact]
+    public async Task Reaproveita_os_limites_enquanto_a_configuracao_nao_muda()
+    {
+        // Refazer a conta a cada rodada seria desperdicio: o historico e diario.
+        _subscriptions.Add("PETR4", "um@teste.com", Agora);
+
+        var quotes = new FakeQuoteProvider();
+        quotes.Set("PETR4", 50m, Historico);
+
+        await BuildTick(quotes, new RecordingSubscriberNotifier()).RunOnceAsync(default);
+        DateTime? primeiroCalculo = _assets.Get("PETR4")!.ThresholdsComputedAt;
+
+        await BuildTick(quotes, new RecordingSubscriberNotifier()).RunOnceAsync(default);
+
+        Assert.Equal(primeiroCalculo, _assets.Get("PETR4")!.ThresholdsComputedAt);
+        Assert.Equal(80.20m, _assets.Get("PETR4")!.SellThreshold);
+    }
+
+    [Fact]
+    public async Task Recalcula_os_limites_quando_os_percentis_mudam_no_config()
+    {
+        // Sem isto, mexer em 'sellPercentile' no config.json não surtia efeito
+        // nenhum até o prazo de 24h vencer — e sem nenhuma mensagem explicando.
+        _subscriptions.Add("PETR4", "um@teste.com", Agora);
+
+        var quotes = new FakeQuoteProvider();
+        quotes.Set("PETR4", 50m, Historico);
+
+        await BuildTick(quotes, new RecordingSubscriberNotifier()).RunOnceAsync(default);
+        Assert.Equal(80.20m, _assets.Get("PETR4")!.SellThreshold);
+
+        // Mesma rodada, mesmo instante: só a configuração mudou.
+        await BuildTick(quotes, new RecordingSubscriberNotifier(), percentilVenda: 30)
+            .RunOnceAsync(default);
+
+        Asset? depois = _assets.Get("PETR4");
+        Assert.Equal(30.70m, depois!.SellThreshold);   // percentil 30 de 1..100
+        Assert.Equal(30, depois.SellPercentile);        // e fica registrado de onde veio
     }
 
     [Fact]
